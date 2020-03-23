@@ -4,6 +4,13 @@ import os
 import cv2
 from PIL import Image
 
+def gyro_data(gyro):
+    return np.asarray([gyro.x, gyro.y, gyro.z])
+
+
+def accel_data(accel):
+    return np.asarray([accel.x, accel.y, accel.z])
+
 def capture_frames(num_frames, dataset_name = 'Tracking Dataset Accelerometer Gyro'):
     ## Setting up work directories
 
@@ -20,8 +27,8 @@ def capture_frames(num_frames, dataset_name = 'Tracking Dataset Accelerometer Gy
     frame_rate = 15
     config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, frame_rate)
     config.enable_stream(rs.stream.color, 640, 480, rs.format.rgb8, frame_rate)
-    # config.enable_stream(rs.stream.accel)
-    # config.enable_stream(rs.stream.gyro)
+    config.enable_stream(rs.stream.accel)
+    config.enable_stream(rs.stream.gyro)
     profile = pipeline.start(config)
     depth_sensor = profile.get_device().first_depth_sensor()
     depth_scale = depth_sensor.get_depth_scale()
@@ -30,6 +37,8 @@ def capture_frames(num_frames, dataset_name = 'Tracking Dataset Accelerometer Gy
     align = rs.align(align_to)
     colorizer = rs.colorizer()
     frame_count = 0
+    accelerometer_data = np.zeros((num_frames, 3))
+    gyroscope_data = np.zeros((num_frames, 3))
 
     for i in list(range(frame_rate*5)):
         frames = pipeline.wait_for_frames()
@@ -39,6 +48,14 @@ def capture_frames(num_frames, dataset_name = 'Tracking Dataset Accelerometer Gy
             frames = pipeline.wait_for_frames()
             aligned_frames = align.process(frames)
             aligned_depth_frame = aligned_frames.get_depth_frame()
+            # import code;
+            # code.interact(local=dict(globals(), **locals()))
+            accel = accel_data(frames[2].as_motion_frame().get_motion_data())
+            gyro = gyro_data(frames[3].as_motion_frame().get_motion_data())
+            accelerometer_data[frame_count, :] = accel
+            gyroscope_data[frame_count, :] = gyro
+            print("accelerometer: ", accel)
+            print("gyro: ", gyro)
             color_frame = aligned_frames.get_color_frame()
             if not aligned_depth_frame or not color_frame:
                 continue
@@ -60,8 +77,8 @@ def capture_frames(num_frames, dataset_name = 'Tracking Dataset Accelerometer Gy
 
             color_image = Image.fromarray(color_image)
             depth_scaled = Image.fromarray(depth_scaled)
-            color_image.save(color_image_path)
-            depth_scaled.save(depth_image_path)
+            # color_image.save(color_image_path)
+            # depth_scaled.save(depth_image_path)
 
             cv2.namedWindow('Align Example', cv2.WINDOW_AUTOSIZE)
             cv2.imshow('Align Example', images)
@@ -72,5 +89,34 @@ def capture_frames(num_frames, dataset_name = 'Tracking Dataset Accelerometer Gy
                 break
     finally:
         pipeline.stop()
+        return accelerometer_data, gyroscope_data
 
-capture_frames(30, dataset_name = 'Tracking Dataset 2')
+# import matplotlib.pyplot as plt
+# accelerometer_data, gyroscope_data = capture_frames(250)
+# time = list(range(250))
+# x_acceleration = accelerometer_data[:,0]
+# y_acceleration = accelerometer_data[:,1]
+# z_acceleration = accelerometer_data[:,2]
+# fig,(ax1, ax2, ax3) = plt.subplots(3,1)
+# ax1.plot(time, x_acceleration); ax1.set_title('x')
+# ax2.plot(time, y_acceleration);ax2.set_title('y')
+# ax3.plot(time, z_acceleration);ax3.set_title('z')
+# fig.show()
+#
+# x_gyro = gyroscope_data[:,0]
+# y_gyro = gyroscope_data[:,1]
+# z_gyro = gyroscope_data[:,2]
+# fig2,(ax1, ax2, ax3) = plt.subplots(3,1)
+# ax1.plot(time, x_gyro); ax1.set_title('x')
+# ax2.plot(time, y_gyro);ax2.set_title('y')
+# ax3.plot(time, z_gyro);ax3.set_title('z')
+# fig2.show()
+#
+# plt.show()
+# import code;
+#
+# code.interact(local=dict(globals(), **locals()))
+#
+# import code;
+#
+# code.interact(local=dict(globals(), **locals()))

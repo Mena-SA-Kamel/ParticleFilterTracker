@@ -13,10 +13,10 @@ import matplotlib.patches as patches
 import operator
 
 image_shape = [480, 640]
-dataset_path = 'Tracking Dataset/rgb'
+dataset_path = 'Tracking Dataset 3/rgb'
 num_images = len(os.listdir(dataset_path))
-first_image_in_dataset = 23
-start_image_number = 53
+first_image_in_dataset = 12
+start_image_number = 12
 frames = list(list(range(start_image_number, num_images + first_image_in_dataset)))
 # import code; code.interact(local=dict(globals(), **locals()))
 frame_name = str(frames[0]) + '.png'
@@ -196,7 +196,7 @@ A = np.array([[1, t, 0, 0, 0, 0],
 num_particles = 200
 num_particles = num_particles - 1
 frame = 0
-sigma = 0.001
+sigma = 0.01
 num_bins = 8
 num_channels = 3
 pi_thresh = 0.75
@@ -226,8 +226,8 @@ Hy_init = np.append(Hy_init, Hy) # Adding the target particle x coordinate
 
 # Initializing the particle x_dot and y_dot
 # originally spread 10. 10
-x_dot_init = np.random.normal(0, math.sqrt(10), size=(num_particles + 1)).astype('int16')
-y_dot_init = np.random.normal(0, math.sqrt(10), size=(num_particles + 1)).astype('int16')
+x_dot_init = np.random.normal(0, math.sqrt(5), size=(num_particles + 1)).astype('int16')
+y_dot_init = np.random.normal(0, math.sqrt(5), size=(num_particles + 1)).astype('int16')
 
 num_states = 6
 # x_init, x_dot_init, y_init, y_dot_init, Hx_init, Hy_init
@@ -299,8 +299,8 @@ for frame in frames:
         # Propagating
         for i in list(range(num_particles + 1)):
             t = 1
-            x2 = int(np.random.normal(0, math.sqrt(10)))
-            y2 = int(np.random.normal(0, math.sqrt(10)))
+            x2 = int(np.random.normal(0, math.sqrt(7)))
+            y2 = int(np.random.normal(0, math.sqrt(7)))
             # x2 = 0
             # y2 = 0
             # originally 3, 3
