@@ -4,7 +4,7 @@ import os
 import cv2
 from PIL import Image
 
-def capture_frames(num_frames, dataset_name = 'Tracking Dataset'):
+def capture_frames(num_frames, dataset_name = 'Tracking Dataset Accelerometer Gyro'):
     ## Setting up work directories
 
     dataset_name = dataset_name
@@ -20,6 +20,8 @@ def capture_frames(num_frames, dataset_name = 'Tracking Dataset'):
     frame_rate = 15
     config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, frame_rate)
     config.enable_stream(rs.stream.color, 640, 480, rs.format.rgb8, frame_rate)
+    # config.enable_stream(rs.stream.accel)
+    # config.enable_stream(rs.stream.gyro)
     profile = pipeline.start(config)
     depth_sensor = profile.get_device().first_depth_sensor()
     depth_scale = depth_sensor.get_depth_scale()
@@ -70,3 +72,5 @@ def capture_frames(num_frames, dataset_name = 'Tracking Dataset'):
                 break
     finally:
         pipeline.stop()
+
+capture_frames(30, dataset_name = 'Tracking Dataset 2')
