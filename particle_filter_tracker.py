@@ -193,27 +193,27 @@ A = np.array([[1, t, 0, 0, 0, 0],
 
 
 ########################################## Initialization ##########################################
-num_particles = 200
+num_particles = 100
 num_particles = num_particles - 1
 frame = 0
 sigma = 0.01
-num_bins = 8
+num_bins = 12
 num_channels = 3
 pi_thresh = 0.75
 alpha = 0.4
 
-results_folder = 'Result 2 - sigma_ ' + str(sigma) +  '_particles_' + str(num_particles) + '_alpha_ ' + str(alpha)
+results_folder = 'Result 2 - sigma_ ' + str(sigma) +  '_particles_' + str(num_particles) + '_alpha_ ' + str(alpha) + '_bins_' + str(num_bins)
 if not os.path.exists(results_folder):
     os.mkdir(results_folder)
 
 
 # Initializing the particle x and y coordinates
 # originally 10, 10
-x_init = np.random.normal(x, math.sqrt(10*Hx), size=(num_particles)).astype('int16')
-y_init = np.random.normal(y, math.sqrt(10*Hy), size=(num_particles)).astype('int16')
-#
-# x_init = np.random.uniform(10, 630, size=(num_particles)).astype('int16')
-# y_init = np.random.uniform(10, 470, size=(num_particles)).astype('int16')
+# x_init = np.random.normal(x, math.sqrt(10*Hx), size=(num_particles)).astype('int16')
+# y_init = np.random.normal(y, math.sqrt(10*Hy), size=(num_particles)).astype('int16')
+
+x_init = np.random.uniform(10, 630, size=(num_particles)).astype('int16')
+y_init = np.random.uniform(10, 470, size=(num_particles)).astype('int16')
 
 x_init = np.append(x_init, x) # Adding the target particle x coordinate
 y_init = np.append(y_init, y) # Adding the target particle x coordinate
@@ -274,7 +274,7 @@ for i in list(range(num_particles + 1)):
 
 ########################################## Particle Filter ##########################################
 
-runs_per_frame = 1
+runs_per_frame = 3
 probabilities = []
 updates = []
 for frame in frames:

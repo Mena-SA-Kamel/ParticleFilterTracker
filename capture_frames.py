@@ -3,15 +3,25 @@ import numpy as np
 import os
 import cv2
 from PIL import Image
+from scipy.signal import butter, lfilter, freqz
+import matplotlib.pyplot as plt
+import datetime
+
 
 def gyro_data(gyro):
     return np.asarray([gyro.x, gyro.y, gyro.z])
 
-
 def accel_data(accel):
     return np.asarray([accel.x, accel.y, accel.z])
 
-def capture_frames(num_frames, dataset_name = 'Tracking Dataset Accelerometer Gyro'):
+def butterworth_filter(type, data, cutoff, fs, order=5):
+    nyquist_freq = 0.5 * fs
+    normal_cutoff = cutoff / nyquist_freq
+    b, a = butter(order, normal_cutoff, btype=type, analog=False)
+    y = lfilter(b, a, data)
+    return y
+
+def capture_frames(num_frames, frame_rate = 15, dataset_name = 'Tracking Dataset Accelerometer Gyro'):
     ## Setting up work directories
 
     dataset_name = dataset_name
@@ -24,7 +34,6 @@ def capture_frames(num_frames, dataset_name = 'Tracking Dataset Accelerometer Gy
 
     pipeline = rs.pipeline()
     config = rs.config()
-    frame_rate = 15
     config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, frame_rate)
     config.enable_stream(rs.stream.color, 640, 480, rs.format.rgb8, frame_rate)
     config.enable_stream(rs.stream.accel)
@@ -39,6 +48,7 @@ def capture_frames(num_frames, dataset_name = 'Tracking Dataset Accelerometer Gy
     frame_count = 0
     accelerometer_data = np.zeros((num_frames, 3))
     gyroscope_data = np.zeros((num_frames, 3))
+    time_data = np.zeros(num_frames)
 
     for i in list(range(frame_rate*5)):
         frames = pipeline.wait_for_frames()
@@ -48,14 +58,26 @@ def capture_frames(num_frames, dataset_name = 'Tracking Dataset Accelerometer Gy
             frames = pipeline.wait_for_frames()
             aligned_frames = align.process(frames)
             aligned_depth_frame = aligned_frames.get_depth_frame()
-            # import code;
-            # code.interact(local=dict(globals(), **locals()))
+            currentDT = datetime.datetime.now()
+            currentDT = str(currentDT).split(' ')[1].split(':')[2]
+            current_seconds = int(currentDT.split('.')[0])
+            current_millis = int(currentDT.split('.')[1])//1000
+            if frame_count ==0:
+                previous_seconds = current_seconds
+                previous_millis = current_millis
+            if previous_seconds == current_seconds:
+                time_step = current_millis - previous_millis
+            else:
+                time_step = current_millis + (1000 - previous_millis)
+            previous_seconds = current_seconds
+            previous_millis = current_millis
+            time_data[frame_count] = time_step
             accel = accel_data(frames[2].as_motion_frame().get_motion_data())
             gyro = gyro_data(frames[3].as_motion_frame().get_motion_data())
             accelerometer_data[frame_count, :] = accel
             gyroscope_data[frame_count, :] = gyro
-            print("accelerometer: ", accel)
-            print("gyro: ", gyro)
+            # print("accelerometer: ", accel)
+            # print("gyro: ", gyro)
             color_frame = aligned_frames.get_color_frame()
             if not aligned_depth_frame or not color_frame:
                 continue
@@ -77,46 +99,136 @@ def capture_frames(num_frames, dataset_name = 'Tracking Dataset Accelerometer Gy
 
             color_image = Image.fromarray(color_image)
             depth_scaled = Image.fromarray(depth_scaled)
-            # color_image.save(color_image_path)
-            # depth_scaled.save(depth_image_path)
 
             cv2.namedWindow('Align Example', cv2.WINDOW_AUTOSIZE)
             cv2.imshow('Align Example', images)
             frame_count = frame_count + 1
             key = cv2.waitKey(1)
             if key & 0xFF == ord('q') or key == 27:
-                cv2.destroyAllWindows()
-                break
+                plt.imshow(color_image)
+                plt.show()
+
     finally:
         pipeline.stop()
-        return accelerometer_data, gyroscope_data
+        return accelerometer_data, gyroscope_data, time_data
 
-# import matplotlib.pyplot as plt
-# accelerometer_data, gyroscope_data = capture_frames(250)
-# time = list(range(250))
-# x_acceleration = accelerometer_data[:,0]
-# y_acceleration = accelerometer_data[:,1]
-# z_acceleration = accelerometer_data[:,2]
-# fig,(ax1, ax2, ax3) = plt.subplots(3,1)
-# ax1.plot(time, x_acceleration); ax1.set_title('x')
-# ax2.plot(time, y_acceleration);ax2.set_title('y')
-# ax3.plot(time, z_acceleration);ax3.set_title('z')
-# fig.show()
+
+num_frames = 1000
+frame_rate = 15
+noise_level = 0.025
+accelerometer_data, gyroscope_data, time_data = capture_frames(num_frames,frame_rate)
+accelerometer_filtered = np.zeros(accelerometer_data.shape)
+for i in list(range(3)):
+    accelerometer_data[:, i] = accelerometer_data[:,i] - np.mean(accelerometer_data[:,i])
+    noise = np.logical_or((accelerometer_data[:, i] < -1 * noise_level), (accelerometer_data[:, i] > noise_level))
+    accelerometer_data[:, i] = accelerometer_data[:, i] * noise
+    max_unfiltered = np.max(accelerometer_data[:, i])
+    if np.sum(accelerometer_data[:, i]) == 0:
+        accelerometer_filtered[:, i] = accelerometer_data[:, i]
+        continue
+    # accelerometer_filtered[:,i] = butterworth_filter('low',accelerometer_data[:,i],1.5,15)
+    # accelerometer_filtered[:, i] = butterworth_filter('high',accelerometer_filtered[:,i],0.01,15)
+    accelerometer_filtered[:, i] = accelerometer_data[:, i]
+    max_filtered = np.max(accelerometer_filtered[:, i])
+    scale = max_unfiltered / max_filtered
+    accelerometer_filtered[:, i] = accelerometer_filtered[:, i] * scale
+
+
+# t = 1/frame_rate
+t = time_data/1000
+dx = np.zeros(num_frames)
+dy = np.zeros(num_frames)
+dz = np.zeros(num_frames)
+vx = 0; vy = 0; vz = 0
+i = 0
+for a in accelerometer_filtered:
+    dx[i] = (vx*t[i]) + 0.5*a[0]*t[i]**2
+    dy[i] = (vy*t[i]) + 0.5*a[1]*t[i]**2
+    dz[i] = (vz*t[i]) + 0.5*a[2]*t[i]**2
+    vx = vx + a[0] * t[i]
+    vy = vy + a[1] * t[i]
+    vz = vz + a[2] * t[i]
+    i = i + 1
+
+time = list(range(num_frames))
+x_acceleration = accelerometer_data[:,0]
+y_acceleration = accelerometer_data[:,1]
+z_acceleration = accelerometer_data[:,2]
+fig4,(ax1, ax2, ax3) = plt.subplots(3,1, sharex='col', sharey='row')
+ax1.plot(time, x_acceleration); ax1.set_title('x'); ax1.set_ylim(np.min(accelerometer_data)-0.05, np.max(accelerometer_data)+0.05)
+ax2.plot(time, y_acceleration);ax2.set_title('y'); ax2.set_ylim(np.min(accelerometer_data)-0.05, np.max(accelerometer_data)+0.05)
+ax3.plot(time, z_acceleration);ax3.set_title('z'); ax3.set_ylim(np.min(accelerometer_data)-0.05, np.max(accelerometer_data)+0.05)
+ax1.set_title('A unfiltered')
+fig4.show()
+
+from scipy.fftpack import fft
+N = num_frames
+T = 1/frame_rate
+x = np.linspace(0.0, N*T, N)
+x_acceleration_fft = fft(x_acceleration)
+x_acceleration_filtered_fft = fft(accelerometer_filtered[:,0])
+xf = np.linspace(0.0, 1.0/(2.0*T), int(N/2))
+
+fig5,(ax1) = plt.subplots(1,1)
+ax1.plot(xf, 2.0/N * np.abs(x_acceleration_fft[0:int(N/2)]))
+ax1.grid()
+fig5.show()
+
+fig6,(ax1) = plt.subplots(1,1)
+ax1.plot(xf, 2.0/N * np.abs(x_acceleration_filtered_fft[0:int(N/2)]))
+ax1.grid()
+fig6.show()
+
+time = list(range(num_frames))
+accelerometer_data = accelerometer_filtered
+x_acceleration = accelerometer_data[:,0]
+y_acceleration = accelerometer_data[:,1]
+z_acceleration = accelerometer_data[:,2]
+fig,(ax1, ax2, ax3) = plt.subplots(3,1)
+# import code; code.interact(local=dict(globals(), **locals()))
+
+ax1.plot(time, x_acceleration); ax1.set_title('x'); ax1.set_ylim(np.min(accelerometer_data)-0.05, np.max(accelerometer_data)+0.05)
+ax2.plot(time, y_acceleration);ax2.set_title('y'); ax2.set_ylim(np.min(accelerometer_data)-0.05, np.max(accelerometer_data)+0.05)
+ax3.plot(time, z_acceleration);ax3.set_title('z'); ax3.set_ylim(np.min(accelerometer_data)-0.05, np.max(accelerometer_data)+0.05)
+ax1.set_title('A filtered')
+fig.show()
+
+x_gyro = gyroscope_data[:,0]
+y_gyro = gyroscope_data[:,1]
+z_gyro = gyroscope_data[:,2]
+fig2,(ax1, ax2, ax3) = plt.subplots(3,1)
+ax1.plot(time, x_gyro); ax1.set_title('x'); ax1.set_ylim(np.min(gyroscope_data)-0.05, np.max(gyroscope_data)+0.05)
+ax2.plot(time, y_gyro);ax2.set_title('y'); ax2.set_ylim(np.min(gyroscope_data)-0.05, np.max(gyroscope_data)+0.05)
+ax3.plot(time, z_gyro);ax3.set_title('z'); ax3.set_ylim(np.min(gyroscope_data)-0.05, np.max(gyroscope_data)+0.05)
+ax1.set_title('Gyroscope unfiltered')
+fig2.show()
+
+fig4,(ax1, ax2, ax3) = plt.subplots(3,1)
+d = np.array([dx, dy, dz])
+ax1.plot(time, dx); ax1.set_title('x'); ax1.set_ylim(np.min(d)-0.05, np.max(d)+0.05)
+ax2.plot(time, dy);ax2.set_title('y'); ax2.set_ylim(np.min(d)-0.05, np.max(d)+0.05)
+ax3.plot(time, dz);ax3.set_title('z'); ax3.set_ylim(np.min(d)-0.05, np.max(d)+0.05)
+ax1.set_title('distance')
+fig4.show()
+
+plt.show()
+
 #
-# x_gyro = gyroscope_data[:,0]
-# y_gyro = gyroscope_data[:,1]
-# z_gyro = gyroscope_data[:,2]
-# fig2,(ax1, ax2, ax3) = plt.subplots(3,1)
-# ax1.plot(time, x_gyro); ax1.set_title('x')
-# ax2.plot(time, y_gyro);ax2.set_title('y')
-# ax3.plot(time, z_gyro);ax3.set_title('z')
-# fig2.show()
+# from matplotlib.animation import FuncAnimation
+# fig9 = plt.figure()
+# x = d_total_x
+# y = d_total_z
+# plt.xlim(int(np.min(x))-0.05, int(np.max(x))+0.05)
+# plt.ylim(int(np.min(y))-0.05, int(np.max(y))+0.05)
+# graph, = plt.plot([], [], 'o')
 #
+# def animate(i):
+#     graph.set_data(x[:i+1], y[:i+1])
+#     return graph
+#
+# ani = FuncAnimation(fig9, animate, frames=num_frames, interval=50)
 # plt.show()
-# import code;
+# # plt.scatter(d_total_x, d_total_z)
+# # plt.show()
+# import code; code.interact(local=dict(globals(), **locals()))
 #
-# code.interact(local=dict(globals(), **locals()))
-#
-# import code;
-#
-# code.interact(local=dict(globals(), **locals()))
