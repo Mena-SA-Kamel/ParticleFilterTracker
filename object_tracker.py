@@ -6,6 +6,7 @@ import skimage.io
 import math
 import matplotlib.patches as patches
 from datetime import datetime
+from PIL import Image
 
 def validate_box(x, y, hx, hy, image_shape):
     if x <= 0:
@@ -80,11 +81,11 @@ def get_color_distribution(coordinates, image, bins):
     # plt.show()
     return histogram
 
-def plot_state(state, mean_state, image, frame_number = 0, save_dir = '', save = True, display_all = False):
+def plot_state(state, image, frame_number = 0, mean_state = '', save_dir = '', save = True, display_mean = False, display_all_states = False, img_name = ''):
     num_particles = state.shape[0]
     fig2, ax2 = plt.subplots(1)
     ax2.imshow(image)
-    if display_all:
+    if display_all_states:
         for i in list(range(num_particles)):
             Hx = int(state[i][4])
             Hy = int(state[i][5])
@@ -92,21 +93,25 @@ def plot_state(state, mean_state, image, frame_number = 0, save_dir = '', save =
             y_coord = int(state[i][2]) - int(Hy / 2)
             rect = patches.Rectangle((x_coord, y_coord), Hx, Hy, linewidth=1, edgecolor='r', facecolor='none')
             ax2.add_patch(rect)
-
-    Hx = int(mean_state[4])
-    Hy = int(mean_state[5])
-    x_coord = int(mean_state[0]) - int(Hx / 2)
-    y_coord = int(mean_state[2]) - int(Hy / 2)
-    mean_rect = patches.Rectangle((x_coord, y_coord), Hx, Hy, linewidth=1, edgecolor='b', facecolor='none')
-    ax2.add_patch(mean_rect)
+    if display_mean:
+        Hx = int(mean_state[4])
+        Hy = int(mean_state[5])
+        x_coord = int(mean_state[0]) - int(Hx / 2)
+        y_coord = int(mean_state[2]) - int(Hy / 2)
+        mean_rect = patches.Rectangle((x_coord, y_coord), Hx, Hy, linewidth=1, edgecolor='b', facecolor='none')
+        ax2.add_patch(mean_rect)
     if save:
-        fig_name = os.path.join(save_dir, str(frame_number) + '.png')
+        fig_name = os.path.join(save_dir, str(frame_number) + img_name +'.png')
         fig2.savefig(fig_name)
     # plt.show()
+    fig2.canvas.draw()
+    image_from_plot = np.frombuffer(fig2.canvas.tostring_rgb(), dtype=np.uint8)
+    image_from_plot = image_from_plot.reshape(fig2.canvas.get_width_height()[::-1] + (3,))
     plt.close()
+    return image_from_plot
 
-def define_initial_target_region(image_path):
-    x, y, Hx, Hy = draw_target_region.draw_region(image_path)
+def define_initial_target_region(image, image_path = ''):
+    x, y, Hx, Hy = draw_target_region.draw_region(image, image_path)
     return [x, y, Hx, Hy]
 
 def get_bhattacharyya_coef(p, q):
@@ -124,7 +129,7 @@ def get_bhattacharyya_distance(p, q):
 
 def get_initial_state(x, y, Hx, Hy, q, num_particles, num_bins, image):
     initial_spread_ratio = 0.01
-    sigma = 0.2 # or 0.2 - decrease to make it narrower
+    sigma = 0.05 # or 0.2 - decrease to make it narrower
     # # Deciding on Sigma value
     # sigmas = np.linspace(0, 0.5, 20)
     # for sigma in sigmas:
@@ -209,16 +214,35 @@ def get_coords(particle):
     Hy = int(particle[0][5])
     return [x, y, Hx, Hy]
 
-def particle_filter(s_t_1, pi_t_1, q, image):
-    sigma = 0.2
+def get_mean_state(s_t, pi_t, sigma):
+    # Estimating mean state
+    pi_observed_normalized = pi_t / np.sum(pi_t)
+    s_t_mean = np.zeros(6)
+    for i in list(range(num_particles)):
+        s_t_mean = s_t_mean + (s_t[i] * pi_observed_normalized[i])
+    s_t_mean = s_t_mean.astype('int16')
+    x, y, Hx, Hy = get_coords(s_t_mean)
+    s_t_mean[0], s_t_mean[2], s_t_mean[4], s_t_mean[5] = validate_box(x, y, Hx, Hy, image_shape)
+    x, y, Hx, Hy = get_coords(s_t_mean)
+    p_estimated = get_color_distribution([x, y, Hx, Hy], image, num_bins)
+    d_mean_state = get_bhattacharyya_distance(p_estimated, q)
+    pi_t_mean = (1 / (sigma * math.sqrt(2 * math.pi))) * math.exp(-(d_mean_state ** 2) / (2 * sigma ** 2))
+    return [s_t_mean, pi_t_mean]
+
+def particle_filter(s_t_1, pi_t_1, q, num_bins, image, results_folder = '', frame_number = 0):
+    num_particles = len(pi_t_1)
+    image_shape = image.shape
+    sigma = 0.05
 
     c_t_1 = create_cummulative_probability_distribution(pi_t_1)
 
     # Selecting N samples based on weights
     resampled_particles_indices = sample_from_cumulative_distribution(c_t_1)
     s_t_1_resampled = s_t_1[resampled_particles_indices]
+    if not results_folder == '':
+        plot_state(s_t_1_resampled, image, frame_number, save_dir = results_folder, save = True, display_all_states = True, img_name= '_resampled')
 
-    st = np.zeros(s_t_1_resampled.shape)
+    s_t = np.zeros(s_t_1_resampled.shape)
 
     # Motion model.
     dt = 1
@@ -232,10 +256,10 @@ def particle_filter(s_t_1, pi_t_1, q, image):
     # Propagating
     for i in list(range(num_particles)):
         t = 1
-        x2 = int(np.random.normal(0, math.sqrt(14))) # To be replaced by acceleration from accelerometer + gyro
-        y2 = int(np.random.normal(0, math.sqrt(14))) # To be replaced by acceleration from accelerometer + gyro
-        hx_noise = int(np.random.normal(0, math.sqrt(14)))
-        hy_noise = int(np.random.normal(0, math.sqrt(14)))
+        x2 = int(np.random.normal(0, math.sqrt(20))) # To be replaced by acceleration from accelerometer + gyro
+        y2 = int(np.random.normal(0, math.sqrt(20))) # To be replaced by acceleration from accelerometer + gyro
+        hx_noise = int(np.random.normal(0, math.sqrt(5)))
+        hy_noise = int(np.random.normal(0, math.sqrt(5)))
 
         w_t_1 = np.array([[0.5 * x2 * t ** 2],
                           [t * x2],
@@ -249,13 +273,13 @@ def particle_filter(s_t_1, pi_t_1, q, image):
         particle_new = A.dot(np.transpose(particle)) + w_t_1
         x, y, Hx, Hy = get_coords(particle_new)
         particle_new[0], particle_new[2], particle_new[4], particle_new[5] = validate_box(x, y, Hx, Hy, image_shape)
-        st[i, :] = np.transpose(particle_new)
+        s_t[i, :] = np.transpose(particle_new)
 
     # Observing
     # x_init, x_dot_init, y_init, y_dot_init, Hx_init, Hy_init
     pi_t = np.zeros(num_particles)
     for i in list(range(num_particles)):
-        particle = st[i, :]
+        particle = s_t[i, :]
         x, y, Hx, Hy = get_coords(particle)
         particle[0], particle[2], particle[4], particle[5] = validate_box(x, y, Hx, Hy, image_shape)
         x, y, Hx, Hy = get_coords(particle)
@@ -269,28 +293,28 @@ def particle_filter(s_t_1, pi_t_1, q, image):
             weight = 2 * np.max(pi_t)
         pi_t[i] = weight
 
-        # Estimating mean state
-        pi_observed_normalized = pi_t / np.sum(pi_t)
-        s_t_mean = np.zeros(len(particle))
-        for i in list(range(num_particles)):
-            s_t_mean = s_t_mean + (st[i] * pi_observed_normalized[i])
-        s_t_mean = s_t_mean.astype('int16')
-        x, y, Hx, Hy = get_coords(s_t_mean)
-        s_t_mean[0], s_t_mean[2], s_t_mean[4], s_t_mean[5] = validate_box(x, y, Hx, Hy, image_shape)
-        x, y, Hx, Hy = get_coords(s_t_mean)
-        p_estimated = get_color_distribution([x, y, Hx, Hy], image, num_bins)
-
-        d_mean_state = get_bhattacharyya_distance(p_estimated, q)
-        pi_t_mean = (1 / (sigma * math.sqrt(2 * math.pi))) * math.exp(-(d_mean_state ** 2) / (2 * sigma ** 2))
-    # import code;
-    # code.interact(local=dict(globals(), **locals()))
-
-    s_t_1 = st
+    # # Estimating mean state
+    # pi_observed_normalized = pi_t / np.sum(pi_t)
+    # s_t_mean = np.zeros(6)
+    # for i in list(range(num_particles)):
+    #     s_t_mean = s_t_mean + (s_t[i] * pi_observed_normalized[i])
+    # s_t_mean = s_t_mean.astype('int16')
+    # x, y, Hx, Hy = get_coords(s_t_mean)
+    # s_t_mean[0], s_t_mean[2], s_t_mean[4], s_t_mean[5] = validate_box(x, y, Hx, Hy, image_shape)
+    # x, y, Hx, Hy = get_coords(s_t_mean)
+    # p_estimated = get_color_distribution([x, y, Hx, Hy], image, num_bins)
+    #
+    # d_mean_state = get_bhattacharyya_distance(p_estimated, q)
+    # pi_t_mean = (1 / (sigma * math.sqrt(2 * math.pi))) * math.exp(-(d_mean_state ** 2) / (2 * sigma ** 2))
+    # # import code;
+    # # code.interact(local=dict(globals(), **locals()))
+    s_t_mean, pi_t_mean = get_mean_state(s_t, pi_t_1, sigma)
+    s_t_1 = s_t
     pi_t_1 = pi_t
     return s_t_1, pi_t_1, s_t_mean, q
 
-
-#### Main Function
+#
+# #### Main Function
 image_shape = [480, 680]
 dataset_path = 'Tracking Dataset 4/rgb'
 num_images = len(os.listdir(dataset_path))
@@ -309,14 +333,14 @@ for frame_number in frame_numbers:
     image = skimage.io.imread(image_path)
 
     if frame_number - start_image_number == 0:
-        x, y, Hx, Hy = define_initial_target_region(image_path)
+        x, y, Hx, Hy = define_initial_target_region(image)
         q = get_color_distribution([x, y, Hx, Hy], image, num_bins)
         s_t_1, pi_t_1 = get_initial_state(x, y, Hx, Hy, q, num_particles, num_bins, image)
-
-    s_t, pi_t, s_t_mean, q = particle_filter(s_t_1, pi_t_1, q, image)
+    s_t, pi_t, s_t_mean, q = particle_filter(s_t_1, pi_t_1, q, num_bins, image, results_folder, frame_number)
     s_t_1 = s_t
     pi_t_1 = pi_t
-    plot_state(s_t, s_t_mean, image, frame_number, results_folder, display_all = True)
+    plot_state(s_t, image, frame_number, mean_state= s_t_mean, save_dir=results_folder, save=True, display_mean=True,
+               display_all_states=True, img_name='')
 
 
 
