@@ -16,9 +16,9 @@ def accel_data(accel):
 frame_rate = 15
 num_frames = 3000
 image_shape = [480, 680]
-num_particles = 200
+num_particles = 500
 num_bins = 12
-runs_per_frame = 3
+runs_per_frame = 1
 current_time = datetime.now()
 results_folder = current_time.strftime("%Y-%m-%d-%H-%M-%S")
 os.mkdir(results_folder)
@@ -110,7 +110,9 @@ while frame_count < num_frames:
             s_t, pi_t, s_t_mean, q = object_tracker.particle_filter(s_t_1, pi_t_1, q, num_bins, color_image)
             s_t_1 = s_t
             pi_t_1 = pi_t
-        color_image = object_tracker.plot_state(s_t, s_t_mean, color_image, frame_count, results_folder, save = False, display_all = True)
+        # color_image = object_tracker.plot_state(s_t, s_t_mean, color_image, frame_count, results_folder, save = False, display_all = True)
+        color_image = object_tracker.plot_state(s_t, color_image, frame_count, mean_state=s_t_mean, save_dir=results_folder, save=False, display_mean=True,
+                   display_all_states=False, img_name='')
         frame_count = frame_count + 1
 
     # Visualization

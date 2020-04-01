@@ -4,9 +4,7 @@ import numpy as np
 
 drawing = False # true if mouse is pressed
 mode = True # if True, draw rectangle. Press 'm' to toggle to curve
-ix,iy = -1,-1
 points = []
-coords = [0,0,0,0]
 img = mpimg.imread('Tracking Dataset/rgb/23.png')
 
 # mouse callback function
@@ -44,9 +42,12 @@ def draw_circle(event,x,y,flags,param):
         # cv2.ellipse(img, (int((x0 + x1)/2), int((y0+y1)/2)), (int((x1-x0)/2), int((y1-y0)/2)), 0, 0, 360, (0,0,255), 1)
         cv2.rectangle(img, (x0, y0), (x1, y1), (0, 255, 255), -1)
 
-def draw_region(image_path):
+def draw_region(image, image_path = ''):
     global img
-    img = mpimg.imread(image_path)
+    if image_path == '':
+        img = image
+    else:
+        img = mpimg.imread(image_path)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     cv2.namedWindow('image')
     cv2.setMouseCallback('image', draw_circle)
@@ -54,5 +55,6 @@ def draw_region(image_path):
         cv2.imshow('image',img)
         k = cv2.waitKey(1) & 0xFF
         if k == 27:
+            cv2.destroyAllWindows()
             return coords
             break
