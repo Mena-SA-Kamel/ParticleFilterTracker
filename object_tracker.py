@@ -260,8 +260,8 @@ def particle_filter(s_t_1, pi_t_1, q, num_bins, image, results_folder = '', fram
         t = 1
         x2 = int(np.random.normal(0, math.sqrt(60))) # To be replaced by acceleration from accelerometer + gyro
         y2 = int(np.random.normal(0, math.sqrt(60))) # To be replaced by acceleration from accelerometer + gyro
-        hx_noise = int(np.random.normal(0, math.sqrt(3)))
-        hy_noise = int(np.random.normal(0, math.sqrt(3)))
+        hx_noise = int(np.random.normal(0, math.sqrt(0.5)))
+        hy_noise = int(np.random.normal(0, math.sqrt(0.5)))
 
         w_t_1 = np.array([[0.5 * x2 * t ** 2],
                           [t * x2],
@@ -315,32 +315,32 @@ def particle_filter(s_t_1, pi_t_1, q, num_bins, image, results_folder = '', fram
     pi_t_1 = pi_t
     return s_t_1, pi_t_1, s_t_mean, q
 
-#
-# # #### Main Function
-# image_shape = [480, 680]
-# dataset_path = 'Tracking Dataset 4/rgb'
-# num_images = len(os.listdir(dataset_path))
-# start_image_number = 10
-# frame_numbers = list(list(range(start_image_number, num_images + start_image_number)))
-#
-# num_particles = 500
-# num_bins = 12
-# current_time = datetime.now()
-# results_folder = current_time.strftime("%Y-%m-%d-%H-%M-%S")
-# os.mkdir(results_folder)
-#
-# for frame_number in frame_numbers:
-#     frame_name = str(frame_number) + '.png'
-#     image_path = os.path.join(dataset_path, frame_name)
-#     image = skimage.io.imread(image_path)
-#
-#     if frame_number - start_image_number == 0:
-#         x, y, Hx, Hy = define_initial_target_region(image)
-#         q = get_color_distribution([x, y, Hx, Hy], image, num_bins)
-#         s_t_1, pi_t_1 = get_initial_state(x, y, Hx, Hy, q, num_particles, num_bins, image)
-#     s_t, pi_t, s_t_mean, q = particle_filter(s_t_1, pi_t_1, q, num_bins, image, results_folder, frame_number)
-#     s_t_1 = s_t
-#     pi_t_1 = pi_t
-#     plot_state(s_t, image, frame_number, mean_state= s_t_mean, save_dir=results_folder, save=True, display_mean=True,
-#                display_all_states=True, img_name='')
-#
+
+# #### Main Function
+image_shape = [480, 680]
+dataset_path = 'Datasets/Tracking Dataset 4/rgb'
+num_images = len(os.listdir(dataset_path))
+start_image_number = 10
+frame_numbers = list(list(range(start_image_number, num_images + start_image_number)))
+
+num_particles = 500
+num_bins = 12
+current_time = datetime.now()
+results_folder = current_time.strftime("%Y-%m-%d-%H-%M-%S")
+os.mkdir(results_folder)
+
+for frame_number in frame_numbers:
+    frame_name = str(frame_number) + '.png'
+    image_path = os.path.join(dataset_path, frame_name)
+    image = skimage.io.imread(image_path)
+
+    if frame_number - start_image_number == 0:
+        x, y, Hx, Hy = define_initial_target_region(image)
+        q = get_color_distribution([x, y, Hx, Hy], image, num_bins)
+        s_t_1, pi_t_1 = get_initial_state(x, y, Hx, Hy, q, num_particles, num_bins, image)
+    s_t, pi_t, s_t_mean, q = particle_filter(s_t_1, pi_t_1, q, num_bins, image, results_folder, frame_number)
+    s_t_1 = s_t
+    pi_t_1 = pi_t
+    plot_state(s_t, image, frame_number, mean_state= s_t_mean, save_dir=results_folder, save=True, display_mean=True,
+               display_all_states=True, img_name='')
+

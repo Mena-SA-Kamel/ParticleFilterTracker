@@ -13,7 +13,7 @@ import matplotlib.patches as patches
 import operator
 
 image_shape = [480, 640]
-dataset_path = 'Tracking Dataset 3/rgb'
+dataset_path = 'Datasets/Tracking Dataset 3/rgb'
 num_images = len(os.listdir(dataset_path))
 first_image_in_dataset = 12
 start_image_number = 12
@@ -59,7 +59,6 @@ def get_bhattacharyya_distance(p, q):
     distances = np.zeros(num_channels)
     for channel in list(range(num_channels)):
         distances[channel] = math.sqrt(1 - get_bhattacharyya_coef(p,q)[channel])
-
     return distances
 
 def get_color_distribution(coordinates, image, bins):
@@ -193,27 +192,27 @@ A = np.array([[1, t, 0, 0, 0, 0],
 
 
 ########################################## Initialization ##########################################
-num_particles = 100
+num_particles = 500
 num_particles = num_particles - 1
 frame = 0
 sigma = 0.01
 num_bins = 12
 num_channels = 3
-pi_thresh = 0.75
-alpha = 0.4
+pi_thresh = 8
+alpha = 0.6
 
-results_folder = 'Result 2 - sigma_ ' + str(sigma) +  '_particles_' + str(num_particles) + '_alpha_ ' + str(alpha) + '_bins_' + str(num_bins)
+results_folder = 'Result 2 - sigma_ ' + str(sigma) + '_pi_thresh_' + str(pi_thresh) +\
+                 '_particles_' + str(num_particles) + '_alpha_ ' + str(alpha) + '_bins_' + str(num_bins) + '_Dataset_4'
 if not os.path.exists(results_folder):
     os.mkdir(results_folder)
 
-
 # Initializing the particle x and y coordinates
 # originally 10, 10
-# x_init = np.random.normal(x, math.sqrt(10*Hx), size=(num_particles)).astype('int16')
-# y_init = np.random.normal(y, math.sqrt(10*Hy), size=(num_particles)).astype('int16')
-
-x_init = np.random.uniform(10, 630, size=(num_particles)).astype('int16')
-y_init = np.random.uniform(10, 470, size=(num_particles)).astype('int16')
+x_init = np.random.normal(x, math.sqrt(0.01*Hx), size=(num_particles)).astype('int16')
+y_init = np.random.normal(y, math.sqrt(0.01*Hy), size=(num_particles)).astype('int16')
+#
+# x_init = np.random.uniform(10, 630, size=(num_particles)).astype('int16')
+# y_init = np.random.uniform(10, 470, size=(num_particles)).astype('int16')
 
 x_init = np.append(x_init, x) # Adding the target particle x coordinate
 y_init = np.append(y_init, y) # Adding the target particle x coordinate
@@ -226,8 +225,8 @@ Hy_init = np.append(Hy_init, Hy) # Adding the target particle x coordinate
 
 # Initializing the particle x_dot and y_dot
 # originally spread 10. 10
-x_dot_init = np.random.normal(0, math.sqrt(5), size=(num_particles + 1)).astype('int16')
-y_dot_init = np.random.normal(0, math.sqrt(5), size=(num_particles + 1)).astype('int16')
+x_dot_init = np.random.normal(0, math.sqrt(15), size=(num_particles + 1)).astype('int16')
+y_dot_init = np.random.normal(0, math.sqrt(15), size=(num_particles + 1)).astype('int16')
 
 num_states = 6
 # x_init, x_dot_init, y_init, y_dot_init, Hx_init, Hy_init
@@ -242,7 +241,7 @@ for i in list(range(num_particles + 1)):
     s_t_1[i, 5] = Hy_init[i]
 
 # Initializing the particle weights, pi
-q = get_color_distribution([x, y, Hx, Hy], img, num_bins) # to be adapted eventually
+q = get_color_distribution([x, y, Hx, Hy], img, num_bins)
 
 pi_t_1 = np.zeros(num_particles + 1)
 for i in list(range(num_particles + 1)):
@@ -274,7 +273,7 @@ for i in list(range(num_particles + 1)):
 
 ########################################## Particle Filter ##########################################
 
-runs_per_frame = 3
+runs_per_frame = 1
 probabilities = []
 updates = []
 for frame in frames:
@@ -301,11 +300,9 @@ for frame in frames:
             t = 1
             x2 = int(np.random.normal(0, math.sqrt(7)))
             y2 = int(np.random.normal(0, math.sqrt(7)))
-            # x2 = 0
-            # y2 = 0
             # originally 3, 3
-            hx_noise = int(np.random.normal(0, math.sqrt(3)))
-            hy_noise = int(np.random.normal(0, math.sqrt(3)))
+            hx_noise = int(np.random.normal(0, math.sqrt(6)))
+            hy_noise = int(np.random.normal(0, math.sqrt(6)))
 
             w_t_1 = np.array([[0.5 * x2 * t ** 2],
                                [t * x2],
