@@ -84,7 +84,8 @@ def get_color_distribution(coordinates, image, bins):
 def plot_state(state, image, frame_number = 0, mean_state = '', save_dir = '', save = True, display_mean = False, display_all_states = False, img_name = ''):
     num_particles = state.shape[0]
     fig2, ax2 = plt.subplots(1)
-    ax2.imshow(image)
+    color_image = image[:,:,0:3].astype('uint8')
+    ax2.imshow(color_image)
     if display_all_states:
         for i in list(range(num_particles)):
             Hx = int(state[i][4])
@@ -260,8 +261,8 @@ def particle_filter(s_t_1, pi_t_1, q, num_bins, image, results_folder = '', fram
         t = 1
         x2 = int(np.random.normal(0, math.sqrt(60))) # To be replaced by acceleration from accelerometer + gyro
         y2 = int(np.random.normal(0, math.sqrt(60))) # To be replaced by acceleration from accelerometer + gyro
-        hx_noise = int(np.random.normal(0, math.sqrt(0.5)))
-        hy_noise = int(np.random.normal(0, math.sqrt(0.5)))
+        hx_noise = int(np.random.normal(0, math.sqrt(3)))
+        hy_noise = int(np.random.normal(0, math.sqrt(3)))
 
         w_t_1 = np.array([[0.5 * x2 * t ** 2],
                           [t * x2],
@@ -318,9 +319,9 @@ def particle_filter(s_t_1, pi_t_1, q, num_bins, image, results_folder = '', fram
 
 # #### Main Function
 image_shape = [480, 680]
-dataset_path = 'Datasets/Tracking Dataset 4/rgb'
-num_images = len(os.listdir(dataset_path))
-start_image_number = 10
+dataset_path = 'Datasets/Tracking Dataset 3'
+num_images = len(os.listdir(os.path.join(dataset_path, 'rgb')))
+start_image_number = 12
 frame_numbers = list(list(range(start_image_number, num_images + start_image_number)))
 
 num_particles = 500
@@ -331,16 +332,21 @@ os.mkdir(results_folder)
 
 for frame_number in frame_numbers:
     frame_name = str(frame_number) + '.png'
-    image_path = os.path.join(dataset_path, frame_name)
-    image = skimage.io.imread(image_path)
+
+    color_image = skimage.io.imread(os.path.join(dataset_path, 'rgb', frame_name))
+    depth_image = skimage.io.imread(os.path.join(dataset_path, 'depth', frame_name))
+    depth_scaled = ((depth_image / float(np.max(depth_image))) * 255).astype('uint8')
+    rgbd_image = np.zeros([color_image.shape[0], color_image.shape[1], 4])
+    rgbd_image[:, :, 0:3] = color_image
+    rgbd_image[:, :, 3] = depth_image
 
     if frame_number - start_image_number == 0:
-        x, y, Hx, Hy = define_initial_target_region(image)
-        q = get_color_distribution([x, y, Hx, Hy], image, num_bins)
-        s_t_1, pi_t_1 = get_initial_state(x, y, Hx, Hy, q, num_particles, num_bins, image)
-    s_t, pi_t, s_t_mean, q = particle_filter(s_t_1, pi_t_1, q, num_bins, image, results_folder, frame_number)
+        x, y, Hx, Hy = define_initial_target_region(color_image)
+        q = get_color_distribution([x, y, Hx, Hy], rgbd_image, num_bins)
+        s_t_1, pi_t_1 = get_initial_state(x, y, Hx, Hy, q, num_particles, num_bins, rgbd_image)
+    s_t, pi_t, s_t_mean, q = particle_filter(s_t_1, pi_t_1, q, num_bins, rgbd_image, results_folder, frame_number)
     s_t_1 = s_t
     pi_t_1 = pi_t
-    plot_state(s_t, image, frame_number, mean_state= s_t_mean, save_dir=results_folder, save=True, display_mean=True,
+    plot_state(s_t, rgbd_image, frame_number, mean_state= s_t_mean, save_dir=results_folder, save=True, display_mean=True,
                display_all_states=True, img_name='')
 

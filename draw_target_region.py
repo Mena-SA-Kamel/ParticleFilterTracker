@@ -5,7 +5,8 @@ import numpy as np
 drawing = False # true if mouse is pressed
 mode = True # if True, draw rectangle. Press 'm' to toggle to curve
 points = []
-img = mpimg.imread('Tracking Dataset/rgb/23.png')
+image_shape = [480, 680]
+img = np.zeros([image_shape[0], image_shape[1], 3])
 
 # mouse callback function
 def draw_circle(event,x,y,flags,param):
