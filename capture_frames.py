@@ -25,10 +25,11 @@ def butterworth_filter(type, data, cutoff, fs, order=5):
 def capture_frames(num_frames, frame_rate = 15, dataset_name = 'Tracking Dataset Accelerometer Gyro'):
     ## Setting up work directories
     if not os.path.exists(dataset_name):
-        os.mkdir(dataset_name)
+        dataset_path = os.path.join("Datasets", dataset_name)
+        os.mkdir(dataset_path)
         folders = ['rgb', 'depth']
         for folder in folders:
-            folder_path = os.path.join(dataset_name, folder)
+            folder_path = os.path.join(dataset_path, folder)
             os.mkdir(folder_path)
 
     pipeline = rs.pipeline()
@@ -128,8 +129,8 @@ def capture_frames(num_frames, frame_rate = 15, dataset_name = 'Tracking Dataset
 
             # Saving the images
             image_name = frame_count
-            color_image_path = os.path.join(dataset_name, 'rgb', str(image_name) + '.png')
-            depth_image_path = os.path.join(dataset_name, 'depth', str(image_name) + '.png')
+            color_image_path = os.path.join(dataset_path, 'rgb', str(image_name) + '.png')
+            depth_image_path = os.path.join(dataset_path, 'depth', str(image_name) + '.png')
 
             Image.fromarray(color_image).save(color_image_path)
             Image.fromarray(depth_scaled).save(depth_image_path)
@@ -152,10 +153,10 @@ def capture_frames(num_frames, frame_rate = 15, dataset_name = 'Tracking Dataset
         return accelerometer_data, gyroscope_data, time_data, depth_intrinsics, depth_scale
 #
 #
-# num_frames = 500
-# frame_rate = 15
-# noise_level = 0.025
-# accelerometer_data, gyroscope_data, time_data, depth_intrinsics, depth_scale = capture_frames(num_frames,frame_rate, 'Tracking Dataset 5')
+num_frames = 150
+frame_rate = 15
+noise_level = 0.025
+accelerometer_data, gyroscope_data, time_data, depth_intrinsics, depth_scale = capture_frames(num_frames,frame_rate, 'Tracking Dataset 7')
 # # import code;
 # #
 # # code.interact(local=dict(globals(), **locals()))
