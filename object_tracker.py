@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import skimage.io
 import math
 import matplotlib.patches as patches
+from mpl_toolkits.mplot3d import Axes3D
 from datetime import datetime
 from skimage.feature import hog
 import skimage.io
@@ -41,29 +42,26 @@ def validate_box(x, y, hx, hy, image_shape):
 
 def get_hog_distributions(image, num_bins):
     pixels_per_cell = 8
-    fd, hog_image = hog(image, orientations=num_bins, pixels_per_cell=(pixels_per_cell, pixels_per_cell),
-                        cells_per_block=(1, 1), visualize=True, multichannel=True)
+    fd, hog_image = skimage.feature.hog(image, orientations=num_bins, pixels_per_cell=(pixels_per_cell, pixels_per_cell),
+                                        cells_per_block=(1, 1), visualize=True, multichannel=True)
 
     x_dimension = int(image.shape[1] / pixels_per_cell)
     y_dimension = int(image.shape[0] / pixels_per_cell)
     fd_reshaped = fd.reshape(x_dimension*y_dimension, num_bins)
     degrees = np.array(list(range(num_bins))) * (180/num_bins)
-    gradients = []
-    orientations = []
 
-    for image_segment in fd_reshaped:
-        gradient = np.max(image_segment)
-        orientation = np.argmax(image_segment)
-        gradients.append(gradient)
-        orientations.append(degrees[orientation])
+    gradients = np.max(fd_reshaped, axis = 1)
+    orientations = np.argmax(fd_reshaped, axis = 1)
 
-    orientations_histogram = np.histogram(orientations, bins=num_bins)[0]
-    gradients_histogram = np.histogram(gradients, bins=num_bins)[0]
-
-    orientations_histogram = orientations_histogram / np.sum(orientations_histogram)
-    gradients_histogram = gradients_histogram / np.sum(gradients_histogram)
-
-    return orientations_histogram, gradients_histogram
+    #
+    # orientations_histogram = np.histogram(orientations, bins=num_bins)[0]
+    # gradients_histogram = np.histogram(gradients, bins=num_bins)[0]
+    #
+    # orientations_histogram = orientations_histogram / np.sum(orientations_histogram)
+    # gradients_histogram = gradients_histogram / np.sum(gradients_histogram)
+    orientations = orientations.reshape(y_dimension, x_dimension)
+    gradients = gradients.reshape(y_dimension, x_dimension)
+    return [orientations, gradients]
 
 def get_color_distribution(coordinates, image, bins):
     x, y, hx, hy = coordinates
@@ -96,40 +94,89 @@ def get_color_distribution(coordinates, image, bins):
     weights = (d < 1) * (1 - d ** 2)
     weights_flattened = weights.flatten()
 
+    ####################################################################################################################
+    # Visualizing weights
+    # fig, axs = plt.subplots(1, 2)
+    # axs[0].imshow(weights, cmap='gray')
+    # axs[0].set_title('k(r)')
+    # axs[1].imshow(target_region[:,:, 0:3].astype('uint8'))
+    # axs[1].set_title('RoI')
+    # plt.show()
+    ####################################################################################################################
+
     # Calculating the histogram
+    channel_bins = bins
     num_channels = target_region.shape[2]
     histogram = []
     for channel in list(range(num_channels)):
         channel_pixels = target_region[:,:,channel].flatten()
-        channel_histogram = np.histogram(channel_pixels, bins=bins, range=(0, 255), weights=weights_flattened)[0]
-        histogram.append(channel_histogram/ np.sum(channel_histogram))
+        if channel == 3:
+            channel_bins = int(0.5*bins)
+        channel_histogram = np.histogram(channel_pixels, bins=channel_bins, range=(0, 255), weights=weights_flattened)[0]
+        histogram.extend(channel_histogram/ np.sum(channel_histogram)*0.25)
+
     histogram = np.array(histogram).flatten()
-    histogram = histogram / np.sum(histogram)
+    histogram = histogram
     histogram = histogram.reshape((1, len(histogram)))
 
-    # plt.bar(list(range(len(histogram[0]))), histogram[0])
+    ####################################################################################################################
+    # Visualizing color distribution
+    # fig, ax1 = plt.subplots(1)
+    # bar_chart = ax1.bar(list(range(histogram.shape[1])), histogram[0])
+    # colours = ['r', 'g', 'b', 'k']
+    # for i in list(range(histogram.shape[1])):
+    #     index = int(i/bins)
+    #     if index > 3:
+    #         index = 3
+    #     bar_chart[i].set_color(colours[index])
+    # ax1.set_title('Color distribution p(y)')
+    # ax1.set_xlabel('Bins')
+    # ax1.set_ylabel('p(y)')
     # plt.show()
+    # import code;
+    # code.interact(local=dict(globals(), **locals()))
+    ####################################################################################################################
+
     return histogram
 
-def plot_state(state, image, frame_number = 0, mean_state = '', save_dir = '', save = True, display_mean = False, display_all_states = False, img_name = ''):
+def plot_state(state, image, frame_number = 0, mean_state = '', save_dir = '', save = True, display_mean = False, display_all_states = False, img_name = '', title = '', history = []):
     num_particles = state.shape[0]
     fig2, ax2 = plt.subplots(1)
     color_image = image[:,:,0:3].astype('uint8')
     ax2.imshow(color_image)
+    ax2.set_title(title)
     if display_all_states:
         for i in list(range(num_particles)):
             Hx = int(state[i][4])
             Hy = int(state[i][5])
             x_coord = int(state[i][0]) - int(Hx / 2)
             y_coord = int(state[i][2]) - int(Hy / 2)
-            rect = patches.Rectangle((x_coord, y_coord), Hx, Hy, linewidth=1, edgecolor='r', facecolor='none')
+            rect = patches.Rectangle((x_coord, y_coord), Hx, Hy, linewidth=1, edgecolor='g', facecolor='none')
             ax2.add_patch(rect)
     if display_mean:
+        i = 0
+        if not len(history) ==0:
+            for prev_state in history:
+                if i%5 == 0:
+                    history_new = np.array(history)
+                    history_x = history_new[:, 0]
+                    history_y = history_new[:, 2]
+                    Hx = int(prev_state[4])
+                    Hy = int(prev_state[5])
+                    x_coord = int(prev_state[0]) - int(Hx / 2)
+                    y_coord = int(prev_state[2]) - int(Hy / 2)
+                    plt.plot(history_x, history_y, linewidth=1, color='c')
+                    history_rect = patches.Rectangle((x_coord, y_coord), Hx, Hy, linewidth=0.5, edgecolor='r',
+                                                      facecolor='none')
+                    # import code;
+                    # code.interact(local=dict(globals(), **locals()))
+                    ax2.add_patch(history_rect)
+                i = i + 1
         Hx = int(mean_state[4])
         Hy = int(mean_state[5])
         x_coord = int(mean_state[0]) - int(Hx / 2)
         y_coord = int(mean_state[2]) - int(Hy / 2)
-        mean_rect = patches.Rectangle((x_coord, y_coord), Hx, Hy, linewidth=1, edgecolor='b', facecolor='none')
+        mean_rect = patches.Rectangle((x_coord, y_coord), Hx, Hy, linewidth=2.5, edgecolor='b', facecolor='none')
         ax2.add_patch(mean_rect)
     if save:
         fig_name = os.path.join(save_dir, str(frame_number) + img_name +'.png')
@@ -220,11 +267,9 @@ def create_cummulative_probability_distribution(pi_t_1):
     for i in list(range(1, num_particles)):
         c_t_1[i] = c_t_1[i - 1] + pi_t_1[i]
     c_t_1 = c_t_1 / c_t_1[-1]
-    # plt.plot(list(range(num_particles)), c_t_1)
-    # plt.show()
     return c_t_1
 
-def sample_from_cumulative_distribution(c_t_1):
+def sample_from_cumulative_distribution(c_t_1, frame_number, results_folder):
     num_samples = len(c_t_1)
     new_samples = []
     u = np.zeros(num_samples + 1)
@@ -235,6 +280,19 @@ def sample_from_cumulative_distribution(c_t_1):
             i = i + 1
         new_samples.append(i)
         u[j+1] = u[j] + 1/num_samples
+
+    ####################################################################################################################
+    # Visualizing resampling
+    # fig3, ax3 = plt.subplots(1)
+    # ax3.plot(list(range(num_samples)), c_t_1)
+    # ax3.scatter(new_samples, c_t_1[new_samples], color = 'r')
+    # ax3.set_title("Particle cumulative distribution function - Frame: " + str(frame_number))
+    # ax3.set_xlabel('Particle index, i')
+    # ax3.set_ylabel('Cumulative probability, c')
+    # fig_name = os.path.join(results_folder, str(frame_number) + '_sus')
+    # fig3.savefig(fig_name)
+    # plt.close()
+    ####################################################################################################################
     return new_samples
 
 def get_coords(particle):
@@ -262,7 +320,8 @@ def get_mean_state(s_t, pi_t, sigma, q, image, num_bins):
     pi_t_mean = (1 / (sigma * math.sqrt(2 * math.pi))) * math.exp(-(d_mean_state ** 2) / (2 * sigma ** 2))
     return [s_t_mean, pi_t_mean]
 
-def particle_filter(s_t_1, pi_t_1, q, num_bins, image, probabilities, target_updates, results_folder = '', frame_number = 0, start_num = 0, pi_thresh = 1):
+def particle_filter(s_t_1, pi_t_1, q, num_bins, image, probabilities, target_updates, results_folder = '',
+                    frame_number = 0, start_num = 0, pi_thresh = 1, scale = 1):
     num_particles = len(pi_t_1)
     image_shape = image.shape
     sigma = 0.05
@@ -271,10 +330,10 @@ def particle_filter(s_t_1, pi_t_1, q, num_bins, image, probabilities, target_upd
     c_t_1 = create_cummulative_probability_distribution(pi_t_1)
 
     # Selecting N samples based on weights
-    resampled_particles_indices = sample_from_cumulative_distribution(c_t_1)
+    resampled_particles_indices = sample_from_cumulative_distribution(c_t_1, frame_number, results_folder)
     s_t_1_resampled = s_t_1[resampled_particles_indices]
-    if not results_folder == '':
-        plot_state(s_t_1_resampled, image, frame_number, save_dir = results_folder, save = True, display_all_states = True, img_name= '_resampled')
+    # if not results_folder == '':
+    #     plot_state(s_t_1_resampled, image, frame_number, save_dir = results_folder, save = True, display_all_states = True, img_name= '_resampled', title = 'After resampling')
 
     s_t = np.zeros(s_t_1_resampled.shape)
 
@@ -289,11 +348,20 @@ def particle_filter(s_t_1, pi_t_1, q, num_bins, image, probabilities, target_upd
 
     # Propagating
     for i in list(range(num_particles)):
+        particle = s_t_1_resampled[i, :]
+        Hx_old = particle[4]
+        Hy_old = particle[5]
         t = 1
-        x2 = int(np.random.normal(0, math.sqrt(60))) # To be replaced by acceleration from accelerometer + gyro
-        y2 = int(np.random.normal(0, math.sqrt(60))) # To be replaced by acceleration from accelerometer + gyro
+        x2 = int(np.random.normal(0, math.sqrt(90))) # To be replaced by acceleration from accelerometer + gyro
+        y2 = int(np.random.normal(0, math.sqrt(90))) # To be replaced by acceleration from accelerometer + gyro
         hx_noise = int(np.random.normal(0, math.sqrt(10)))
         hy_noise = int(np.random.normal(0, math.sqrt(10)))
+
+        new_scale = (Hy_old + hy_noise) / (Hx_old + hx_noise)
+        # while new_scale < 0.8*scale or new_scale > 1.2*scale:
+        #     hx_noise = int(np.random.normal(0, math.sqrt(10)))
+        #     hy_noise = int(np.random.normal(0, math.sqrt(10)))
+        #     new_scale = (Hy_old + hy_noise) / (Hx_old + hx_noise)
 
         w_t_1 = np.array([[0.5 * x2 * t ** 2],
                           [t * x2],
@@ -302,7 +370,7 @@ def particle_filter(s_t_1, pi_t_1, q, num_bins, image, probabilities, target_upd
                           [hx_noise],
                           [hy_noise]])
 
-        particle = s_t_1_resampled[i, :]
+
         particle = particle.reshape(1, len(particle))
         particle_new = A.dot(np.transpose(particle)) + w_t_1
         x, y, Hx, Hy = get_coords(particle_new)
@@ -312,6 +380,8 @@ def particle_filter(s_t_1, pi_t_1, q, num_bins, image, probabilities, target_upd
     # Observing
     # x_init, x_dot_init, y_init, y_dot_init, Hx_init, Hy_init
     pi_t = np.zeros(num_particles)
+    distance_data = []
+    weights_data = []
     for i in list(range(num_particles)):
         particle = s_t[i, :]
         x, y, Hx, Hy = get_coords(particle)
@@ -326,72 +396,113 @@ def particle_filter(s_t_1, pi_t_1, q, num_bins, image, probabilities, target_upd
             code.interact(local=dict(globals(), **locals()))
             weight = 2 * np.max(pi_t)
         pi_t[i] = weight
+        distance_data.append([x, y, d])
+        weights_data.append([x, y, weight])
 
-    s_t_1 = s_t
-    pi_t_1 = pi_t
-
-    s_t_mean, pi_t_mean = get_mean_state(s_t, pi_t_1, sigma, q, image, num_bins)
+    ####################################################################################################################
+    # Visualizing Bhattacharya Distance and Weights
+    # fig = plt.figure()
+    # data = np.array(distance_data)
+    # ax2 = fig.add_subplot(1, 2, 1, projection='3d')
+    # ax2.scatter(data[:, 0], data[:, 1], data[:, 2])
+    # ax2.set_xlabel('x')
+    # ax2.set_ylabel('y')
+    # ax2.set_zlabel('d')
+    # ax2.set_title('Bhattacharya distance, d')
+    #
+    # data = np.array(weights_data)
+    # ax2 = fig.add_subplot(1, 2, 2, projection='3d')
+    # ax2.scatter(data[:, 0], data[:, 1], data[:, 2])
+    # ax2.set_xlabel('x')
+    # ax2.set_ylabel('y')
+    # ax2.set_zlabel('π')
+    # ax2.set_title('Weights, π, σ = 0.05')
+    # plt.show()
+    ####################################################################################################################
+    s_t_1_mean, pi_t_1_mean = get_mean_state(s_t_1, pi_t_1, sigma, q, image, num_bins)
+    s_t_mean, pi_t_mean = get_mean_state(s_t, pi_t, sigma, q, image, num_bins)
     x, y, Hx, Hy = get_coords(s_t_mean)
     p_mean = get_color_distribution([x, y, Hx, Hy], image, num_bins)
 
     probabilities.append(pi_t_mean)
     update = 0
     if frame_number - start_num == 0:
-        pi_thresh = 0.75*pi_t_mean
-    if pi_t_mean < pi_thresh:
+        pi_thresh = 0.05*pi_t_mean
+
+    if abs(pi_t_mean - pi_t_1_mean) < pi_thresh:
         q = (1 - alpha)*q + (alpha *p_mean)
-        update = 1
+        update = pi_thresh*2
+    print(abs(pi_t_mean - pi_t_1_mean), pi_thresh)
     target_updates.append(update)
+    s_t_1 = s_t
+    pi_t_1 = pi_t
     return s_t_1, pi_t_1, s_t_mean, pi_t_mean, q, probabilities, target_updates, pi_thresh
 
 
-# #### Main Function
-image_shape = [480, 680]
-dataset_path = 'Datasets/Tracking Dataset 6'
-num_images = len(os.listdir(os.path.join(dataset_path, 'rgb')))
-start_image_number = 5
-frame_numbers = list(list(range(start_image_number, num_images + start_image_number)))
+def run():
+    # #### Main Function
+    image_shape = [480, 680]
+    dataset_path = 'Datasets/Tracking Dataset 7'
+    num_images = len(os.listdir(os.path.join(dataset_path, 'rgb')))
+    start_image_number = 5
+    frame_numbers = list(list(range(start_image_number, num_images + start_image_number - 1)))
+    frame_numbers = frame_numbers[0:-1]
 
-num_particles = 300
-num_bins = 12
-pi_thresh = 1
+    num_particles = 500
+    num_bins = 8
+    pi_thresh = 1
 
-current_time = datetime.now()
-results_folder = current_time.strftime("%Y-%m-%d-%H-%M-%S")
-results_folder = dataset_path.split('/')[1] + '-' + results_folder
-os.mkdir(results_folder)
-probabilities = []
-target_updates = []
+    current_time = datetime.now()
+    results_folder = current_time.strftime("%Y-%m-%d-%H-%M-%S")
+    results_folder = dataset_path.split('/')[1] + '-' + results_folder
+    results_folder = os.path.join('Logs',results_folder)
+    os.mkdir(results_folder)
+    probabilities = []
+    target_updates = []
+    counter = 0
+    state_history = []
 
 
-for frame_number in frame_numbers[0:20]:
-    frame_name = str(frame_number) + '.png'
+    for frame_number in frame_numbers:
+        frame_name = str(frame_number) + '.png'
 
-    color_image = skimage.io.imread(os.path.join(dataset_path, 'rgb', frame_name))
-    depth_image = skimage.io.imread(os.path.join(dataset_path, 'depth', frame_name))
-    depth_scaled = ((depth_image / float(np.max(depth_image))) * 255).astype('uint8')
-    rgbd_image = np.zeros([color_image.shape[0], color_image.shape[1], 4])
-    rgbd_image[:, :, 0:3] = color_image
-    rgbd_image[:, :, 3] = depth_image
+        color_image = skimage.io.imread(os.path.join(dataset_path, 'rgb', frame_name))
+        depth_image = skimage.io.imread(os.path.join(dataset_path, 'depth', frame_name))
+        depth_scaled = ((depth_image / float(np.max(depth_image))) * 255).astype('uint8')
+        rgbd_image = np.zeros([color_image.shape[0], color_image.shape[1], 4])
+        rgbd_image[:, :, 0:3] = color_image
+        rgbd_image[:, :, 3] = depth_image
 
-    if frame_number - start_image_number == 0:
-        x, y, Hx, Hy = define_initial_target_region(color_image)
-        q = get_color_distribution([x, y, Hx, Hy], rgbd_image, num_bins)
-        s_t_1, pi_t_1 = get_initial_state(x, y, Hx, Hy, q, num_particles, num_bins, rgbd_image)
-    s_t, pi_t, s_t_mean, pi_t_mean, q, probabilities, target_updates, pi_thresh = particle_filter(s_t_1, pi_t_1, q, num_bins,
-                                                                                       rgbd_image, probabilities,
-                                                                                       target_updates, results_folder,
-                                                                                       frame_number, start_image_number,
-                                                                                       pi_thresh)
-    s_t_1 = s_t
-    pi_t_1 = pi_t
-    plot_state(s_t, rgbd_image, frame_number, mean_state= s_t_mean, save_dir=results_folder, save=True, display_mean=True,
-               display_all_states=True, img_name='')
+        if counter == 0:
+            x, y, Hx, Hy = define_initial_target_region(color_image)
+            q = get_color_distribution([x, y, Hx, Hy], rgbd_image, num_bins)
+            s_t_1, pi_t_1 = get_initial_state(x, y, Hx, Hy, q, num_particles, num_bins, rgbd_image)
 
-fig3, ax3 = plt.subplots(1)
-ax3.plot(frame_numbers, probabilities)
-ax3.plot(frame_numbers, target_updates)
-fig3.show()
-fig_name = os.path.join(results_folder, 'Mean State Weight')
-fig3.savefig(fig_name)
-plt.show()
+        a = (Hy**2 + Hx**2)**0.5
+        s_t, pi_t, s_t_mean, pi_t_mean, q, probabilities, target_updates, pi_thresh = particle_filter(s_t_1, pi_t_1, q, num_bins,
+                                                                                           rgbd_image, probabilities,
+                                                                                           target_updates, results_folder,
+                                                                                           frame_number, start_image_number,
+                                                                                           pi_thresh, scale = Hy/Hx)
+        s_t_1 = s_t
+        pi_t_1 = pi_t
+        state_history.append(s_t_mean)
+        plot_state(s_t, rgbd_image, frame_number, mean_state= s_t_mean, save_dir=results_folder, save=True, display_mean=True,
+                   display_all_states=False, img_name='', title='Frame #: '+str(frame_number - start_image_number), history = [])
+        counter = counter + 1
+
+    ####################################################################################################################
+    # Visualizing target model updates
+    fig3, ax3 = plt.subplots(1)
+    ax3.plot(frame_numbers, probabilities, label='Mean state weight,' + r'$\pi_{E[s]}$')
+    ax3.plot(frame_numbers, target_updates, label='Target model updates')
+    ax3.set_xlabel('Frame numbers')
+    ax3.set_ylabel('Mean state weight')
+    ax3.set_title('Target model updates')
+    fig3.show()
+    fig_name = os.path.join(results_folder, 'Mean State Weight')
+    fig3.savefig(fig_name)
+    ax3.legend()
+    plt.show()
+
+run()

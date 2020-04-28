@@ -153,10 +153,10 @@ def capture_frames(num_frames, frame_rate = 15, dataset_name = 'Tracking Dataset
         return accelerometer_data, gyroscope_data, time_data, depth_intrinsics, depth_scale
 #
 #
-num_frames = 150
-frame_rate = 15
+num_frames = 300
+frame_rate = 60
 noise_level = 0.025
-accelerometer_data, gyroscope_data, time_data, depth_intrinsics, depth_scale = capture_frames(num_frames,frame_rate, 'Tracking Dataset 7')
+accelerometer_data, gyroscope_data, time_data, depth_intrinsics, depth_scale = capture_frames(num_frames,frame_rate, 'Tracking Dataset 17')
 # # import code;
 # #
 # # code.interact(local=dict(globals(), **locals()))

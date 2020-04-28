@@ -13,11 +13,11 @@ def gyro_data(gyro):
 def accel_data(accel):
     return np.asarray([accel.x, accel.y, accel.z])
 
-frame_rate = 15
-num_frames = 3000
+frame_rate = 60
+num_frames = 6000
 image_shape = [480, 680]
 num_particles = 500
-num_bins = 12
+num_bins = 8
 runs_per_frame = 1
 current_time = datetime.now()
 results_folder = current_time.strftime("%Y-%m-%d-%H-%M-%S")
@@ -98,16 +98,24 @@ while frame_count < num_frames:
     rgbd_image[:, :, 3] = depth_scaled
     # image = cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB)
 
+    probabilities = []
+    target_updates = []
+
 
     # Particle Filtering
     if Track == True:
         if frame_count == 0:
             x, y, Hx, Hy = object_tracker.define_initial_target_region(color_image)
-            q = object_tracker.get_color_distribution([x, y, Hx, Hy], color_image, num_bins)
-            s_t_1, pi_t_1 = object_tracker.get_initial_state(x, y, Hx, Hy, q, num_particles, num_bins, color_image)
+            q = object_tracker.get_color_distribution([x, y, Hx, Hy], rgbd_image, num_bins)
+            s_t_1, pi_t_1 = object_tracker.get_initial_state(x, y, Hx, Hy, q, num_particles, num_bins, rgbd_image)
 
         for i in list(range(runs_per_frame)):
-            s_t, pi_t, s_t_mean, q = object_tracker.particle_filter(s_t_1, pi_t_1, q, num_bins, color_image)
+            s_t, pi_t, s_t_mean, pi_t_mean, q, probabilities, target_updates, pi_thresh = object_tracker.particle_filter(s_t_1, pi_t_1,
+                                                                                                          q, num_bins,
+                                                                                                          rgbd_image,
+                                                                                                          probabilities,
+                                                                                                          target_updates,
+                                                                                                          frame_count)
             s_t_1 = s_t
             pi_t_1 = pi_t
         # color_image = object_tracker.plot_state(s_t, s_t_mean, color_image, frame_count, results_folder, save = False, display_all = True)
