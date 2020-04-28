@@ -1,3 +1,11 @@
+########################################################################################################################
+# ECE 9516 - Topics in Autonomous Robotics - Final Project
+# Mena SA Kamel
+# Student Number: 251064703
+# MESc Candidate, Robotics and Control
+# Electrical and Computer Engineering, Western University
+########################################################################################################################
+
 import pyrealsense2 as rs
 import numpy as np
 import os
@@ -80,13 +88,7 @@ def capture_frames(num_frames, frame_rate = 15, dataset_name = 'Tracking Dataset
             pixel_distance_in_meters_2 = aligned_depth_frame.get_distance(depth_pixel_2[0], depth_pixel_2[1])
             depth_point_1 = rs.rs2_deproject_pixel_to_point(depth_intrinsics, depth_pixel_1, depth_scale * pixel_distance_in_meters_1)
             depth_point_2 = rs.rs2_deproject_pixel_to_point(depth_intrinsics, depth_pixel_2, depth_scale * pixel_distance_in_meters_2)
-            #
-            # print("pt 1: ", np.array(depth_point_1)/ depth_scale)
-            # print("pt 2: ", np.array(depth_point_2) / depth_scale)
-            # print ("##########################")
-            #
-            # import code;
-            # code.interact(local=dict(globals(), **locals()))
+
 
             # Timing
             currentDT = datetime.datetime.now()

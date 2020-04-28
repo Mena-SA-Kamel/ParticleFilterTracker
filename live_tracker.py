@@ -1,3 +1,11 @@
+########################################################################################################################
+# ECE 9516 - Topics in Autonomous Robotics - Final Project
+# Mena SA Kamel
+# Student Number: 251064703
+# MESc Candidate, Robotics and Control
+# Electrical and Computer Engineering, Western University
+########################################################################################################################
+
 import pyrealsense2 as rs
 import numpy as np
 import cv2
@@ -119,8 +127,8 @@ while frame_count < num_frames:
             s_t_1 = s_t
             pi_t_1 = pi_t
         # color_image = object_tracker.plot_state(s_t, s_t_mean, color_image, frame_count, results_folder, save = False, display_all = True)
-        color_image = object_tracker.plot_state(s_t, color_image, frame_count, mean_state=s_t_mean, save_dir=results_folder, save=False, display_mean=True,
-                   display_all_states=False, img_name='')
+        color_image = object_tracker.plot_state(s_t, color_image, frame_count, mean_state=s_t_mean, save_dir=results_folder, save=True, display_mean=True,
+                   display_all_states=False, img_name='', title='Frame #: '+str(frame_count))
         frame_count = frame_count + 1
 
     # Visualization

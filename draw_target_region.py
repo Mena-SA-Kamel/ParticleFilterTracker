@@ -1,3 +1,11 @@
+########################################################################################################################
+# ECE 9516 - Topics in Autonomous Robotics - Final Project
+# Mena SA Kamel
+# Student Number: 251064703
+# MESc Candidate, Robotics and Control
+# Electrical and Computer Engineering, Western University
+########################################################################################################################
+
 import cv2
 import matplotlib.image as mpimg
 import numpy as np
