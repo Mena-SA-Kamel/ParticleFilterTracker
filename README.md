@@ -10,5 +10,9 @@ a set of weighted samples.
 The control system first needs to be fed with a target region to track. This can done by an
 instance segmentation algorithm, but for this study the target region is manually specifed by drawing a bounding box using mouse input.
 A stereo-depth camera attached to the user's AR glasses is used to capture an RGB-D image for each frame using an Intel RealSense D435i camera.
+
+The following figure shows the output of the program at select frames. Video had a frame rate of 15 fps.
 ![alt text](https://github.com/Mena-SA-Kamel/ParticleFilterTracker/blob/master/Tracker_example.PNG)
+
+Program works well on irregularily shaped objects. Motion history can be derived from the predicted object tracks in the image frame.
 ![alt text](https://github.com/Mena-SA-Kamel/ParticleFilterTracker/blob/master/Tracker_example_motion_history.PNG)
