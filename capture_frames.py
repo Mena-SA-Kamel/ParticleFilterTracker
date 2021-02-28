@@ -4,6 +4,8 @@
 # Student Number: 251064703
 # MESc Candidate, Robotics and Control
 # Electrical and Computer Engineering, Western University
+
+# THIS SCRIPT CAPTURES AN RGBD DATASET FROM AN INTEL REALSENSE D435I CAMERA
 ########################################################################################################################
 
 import pyrealsense2 as rs
